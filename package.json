@@ -1,0 +1,25 @@
+{
+  "name": "nama-lootbox",
+  "version": "1.0.0",
+  "description": "The Nama Finance Airdrop lootbox program",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.2",
+    "@nomiclabs/hardhat-etherscan": "^2.1.6",
+    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "@nomiclabs/hardhat-web3": "^2.0.0",
+    "@openzeppelin/contracts": "^4.3.2",
+    "@openzeppelin/contracts-upgradeable": "^4.3.2",
+    "@openzeppelin/hardhat-upgrades": "^1.10.0",
+    "chai": "^4.3.4",
+    "ethereum-waffle": "^3.4.0",
+    "ethers": "^5.4.7",
+    "hardhat": "^2.6.6",
+    "hardhat-abi-exporter": "^2.3.0",
+    "hardhat-ethers": "^1.0.1",
+    "hardhat-waffle": "^0.0.1-security",
+    "run-with-testrpc": "^0.3.1",
+    "web3-providers-http": "^1.5.2"
+  }
+}

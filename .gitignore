@@ -1,0 +1,12 @@
+node_modules
+
+.DS_Store
+
+data
+
+#Hardhat files
+cache
+artifacts
+
+.idea
+.openzeppelin
