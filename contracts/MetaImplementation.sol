@@ -1,26 +1,41 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.4;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721BurnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol";
+import "./extensions/RandomlyAssignedUpgradable.sol";
 
+import "hardhat/console.sol";
 
-// This is an upgradeable implementation.
-// The constructor is replaced with initializer.
-// This way, saving a buntch of the deployment costs, about 350k gas instead of 4.5M.
-contract MetaImplementation is ERC721Upgradeable, ERC721EnumerableUpgradeable, OwnableUpgradeable {
+/// @title This is an upgradeable implementation.
+/// The constructor is replaced with initializer.
+/// In this way, we're saving a lot of the deployment costs.
+contract MetaImplementation is
+    ERC721Upgradeable,
+    ERC721EnumerableUpgradeable,
+    PausableUpgradeable,
+    ERC721BurnableUpgradeable,
+    OwnableUpgradeable,
+    RandomlyAssignedUpgradable
+  {
+    // using StringsUpgradeable for uint256;
 
-    uint256 internal _price; // = 0.03 ether;
-    uint256 internal _reserved; // = 200;
+    enum SaleStatus { PENDING, STARTED, PAUSED, ENDED }
 
-    uint256 public MAX_SUPPLY; // = 10000;
-    uint256 public MAX_TOKENS_PER_WALLET; // = 2
-    uint256 public startingIndex;
-
-    bool private _saleStarted;
+    uint256 public MAX_TOKENS_PER_WALLET;
 
     string public baseURI;
+
+    uint256 internal _price;
+    uint256 internal _reserved;
+
+    bool private _noContractMint;
+    SaleStatus private _saleStatus;
 
     function initialize(
         uint256 _startPrice,
@@ -34,73 +49,97 @@ contract MetaImplementation is ERC721Upgradeable, ERC721EnumerableUpgradeable, O
         __ERC721_init(_name, _symbol);
         __ERC721Enumerable_init();
         __Ownable_init();
+        __RandomlyAssigned_init(_maxSupply, 1);
 
         _price = _startPrice;
         _reserved = _nReserved;
-        MAX_SUPPLY = _maxSupply;
         MAX_TOKENS_PER_WALLET = _maxTokensPerWallet;
         baseURI = _uri;
+        _saleStatus = SaleStatus.PENDING;
     }
 
-    // This constructor ensures that this contract can only be used as a master copy
-    // Marking constructor as initializer makes sure that real initializer cannot be called
-    // Thus, as the owner of the contract is 0x0, no one can do anything with the contract
-    // on the other hand, it's impossible to call this function in proxy,
-    // so the real initializer is the only initializer
+    /// @dev This constructor ensures that this contract can only be used as a master copy
+    /// Marking constructor as initializer makes sure that real initializer cannot be called
+    /// Thus, as the owner of the contract is 0x0, no one can do anything with the contract
+    /// on the other hand, it's impossible to call this function in proxy,
+    /// so the real initializer is the only initializer
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() initializer {}
 
+    /// @dev Check if the sale is started
     modifier whenSaleStarted() {
-        require(_saleStarted, "Sale not started");
+        require(_saleStatus == SaleStatus.STARTED, "Sale not started");
         _;
     }
 
+    function mint() external payable whenSaleStarted {
+        uint256 _tokenId = nextToken();
+        console.log("max supply: %s - %s || %s", maxSupply(), _reserved, tokenCount());
+        require(tokenCount() <= maxSupply() - _reserved, "MetaImplementation#mint: no enough NFTs left");
+
+        // Checking if the sender is from a intermediary contract
+        if (!_noContractMint) {
+            require(tx.origin == _msgSender(), "MetaImplementation#mint: cannot mint NFTs through a contract");
+        }
+        
+        // The owner of this contract do not need to pay ethers to mint
+        //   and no constraints on the number of NFTs in the same wallet
+        if (_msgSender() != owner()) {
+            require(msg.value >= _price, "MetaImplementation#mint: inconsistent amount sent");
+            console.log("%s balance: %s - %s", _msgSender(), balanceOf(_msgSender()), MAX_TOKENS_PER_WALLET);
+            require(balanceOf(_msgSender()) < MAX_TOKENS_PER_WALLET, "MetaImplementation#mint: exceeded the max tokens per wallet");
+        }
+
+        _safeMint(_msgSender(), _tokenId);
+    }
+
+    /// @dev Set the base URI
+    /// TODO this might be removed in the future if the base URI cannot be updated
+    ///   onced it setup when the contract was initialized
     function setBaseURI(string calldata uri) external onlyOwner {
         baseURI = uri;
     }
 
-    function mint() external payable whenSaleStarted {
-        uint256 supply = totalSupply();
-        require(supply <= MAX_SUPPLY - _reserved, "Not enough Tokens left.");
-        require(tx.origin == msg.sender, "CANNOT MINT THROUGH A CUSTOM CONTRACT");
-        
-        if (msg.sender != owner()) {
-            require(msg.value >= _price, "Inconsistent amount sent!");
-            require(balanceOf(msg.sender) <= MAX_TOKENS_PER_WALLET, "Exceeded the max tokens per wallet!");
-        }
-
-        _safeMint(msg.sender, supply + 1);
+    /// @dev Update the sale status
+    /// @param _status the new status 
+    function setSaleStatus(SaleStatus _status) external onlyOwner {
+        _saleStatus = _status;
     }
 
-    function kickoffSaleCampaign() external onlyOwner {
-        _saleStarted = true;
-
-        if (_saleStarted && startingIndex == 0) {
-            setStartingIndex();
-        }
-    }
-    
-    function stopSaleCampaign() external onlyOwner {
-        _saleStarted = false;   
+    function disableContractMinting() external onlyOwner {
+        _noContractMint = false;
     }
 
-    function saleStarted() public view returns(bool) {
-        return _saleStarted;
+    function enableContractMinting() external onlyOwner {
+        _noContractMint = true;
+    }
+
+    function saleStatus() public view returns(SaleStatus) {
+        return _saleStatus;
     }
 
     function setPrice(uint256 _newPrice) external onlyOwner {
         _price = _newPrice;
     }
 
-    function getPrice() public view returns (uint256){
+    function getPrice() public view returns (uint256) {
         return _price;
+    }
+
+    function pause() public whenNotPaused onlyOwner {
+        _pause();
+    }
+
+    function unpause() public whenPaused onlyOwner {
+        _unpause();
     }
 
     function getReservedLeft() public view returns (uint256) {
         return _reserved;
     }
 
-    // Helper to list all the NFTs of a wallet
+    /// @dev Helper to list all the NFTs of a wallet
+    /// @param _owner the wallet address to be checked for
     function walletOfOwner(address _owner) external view returns(uint256[] memory) {
         uint256 tokenCount = balanceOf(_owner);
 
@@ -111,62 +150,45 @@ contract MetaImplementation is ERC721Upgradeable, ERC721EnumerableUpgradeable, O
         return tokensId;
     }
 
-    function claimReserved(uint256 _number, address _receiver) external onlyOwner {
-        require(_number <= _reserved, "That would exceed the max reserved.");
+    function claimReserved(uint256 _number, address _receiver)
+        external
+        ensureAvailabilityFor(_number)
+        onlyOwner
+    {
+        require(_number <= _reserved, "MetaImplementation#claimReserved: reached the max reserved");
 
-        uint256 _tokenId = totalSupply();
         for (uint256 i; i < _number; i++) {
-            _safeMint(_receiver, _tokenId + i);
+            _safeMint(_receiver, nextToken());
         }
 
-        _reserved = _reserved - _number;
+        _reserved -= _number;
     }
 
-    // NOTICE: This function is not meant to be called by the user.
-    // Contrary to AvatarNFT, where it is public
-    function setStartingIndex() internal onlyOwner {
-        require(startingIndex == 0, "Starting index is already set");
-
-        // BlockHash only works for the most 256 recent blocks.
-        uint256 _block_shift = uint(keccak256(abi.encodePacked(block.difficulty, block.timestamp)));
-        _block_shift =  1 + (_block_shift % 255);
-
-        // This shouldn't happen, but just in case the blockchain gets a reboot?
-        if (block.number < _block_shift) {
-            _block_shift = 1;
-        }
-
-        uint256 _block_ref = block.number - _block_shift;
-        startingIndex = uint(blockhash(_block_ref)) % MAX_SUPPLY;
-
-        // Prevent default sequence
-        if (startingIndex == 0) {
-            startingIndex = 1;
-        }
-    }
-
-    // withdraw remaining balance to the specified _beneficiary if it's not zero address,
-    // otherwise, send the balance to the contract owner
+    /// @dev Withdraw remaining balance to the specified _beneficiary if it's not zero address,
+    ///   otherwise, send the balance to the contract owner
     function withdraw(address _beneficiary) public onlyOwner {
         uint256 _balance = address(this).balance;
-        require(_balance > 0, "#withdraw: no available balance");
+        require(_balance > 0, "MetaImplementation#withdraw: no available balance");
         
         if (_beneficiary != address(0)) {
             require(payable(_beneficiary).send(_balance));
         } else {
-            require(payable(msg.sender).send(_balance));
+            require(payable(_msgSender()).send(_balance));
         }
     }
     
-    function tokenURI(uint256 tokenId) public view virtual override returns (string memory) {
-        require(
-          _exists(tokenId),
-          "ERC721Metadata: URI query for nonexistant token"
-        );
+    function tokenURI(uint256 tokenId)
+        public
+        view
+        virtual
+        override
+        returns (string memory)
+    {
+        require(_exists(tokenId), "MetaImplementation#tokenURI: nonexistent token");
     
         string memory currentBaseURI = _baseURI();
         return bytes(currentBaseURI).length > 0
-            ? string(abi.encodePacked(currentBaseURI, tokenId, ".json"))
+            ? string(abi.encodePacked(currentBaseURI, StringsUpgradeable.toString(tokenId), ".json"))
             : "";
     }
 
@@ -186,7 +208,15 @@ contract MetaImplementation is ERC721Upgradeable, ERC721EnumerableUpgradeable, O
     function _beforeTokenTransfer(address from, address to, uint256 tokenId)
         internal
         override(ERC721Upgradeable, ERC721EnumerableUpgradeable)
+        whenNotPaused
     {
         super._beforeTokenTransfer(from, to, tokenId);
+    }
+
+    function _burn(uint256 tokenId)
+        internal
+        override(ERC721Upgradeable)
+    {
+        super._burn(tokenId);
     }
 }

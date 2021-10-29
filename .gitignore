@@ -3,6 +3,7 @@ node_modules
 .DS_Store
 
 data
+.env
 
 #Hardhat files
 cache

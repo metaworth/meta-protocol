@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.7;
+pragma solidity ^0.8.4;
 
 
 import "@openzeppelin/contracts/proxy/Clones.sol";
@@ -10,7 +10,7 @@ contract MetaFactory {
 
     address public immutable proxyImplementation;
 
-    event NFTCreated(address deployedAddress);
+    event NFTCreated(address indexed _owner, address indexed _metaAddress);
 
     constructor() {
         proxyImplementation = address(new MetaImplementation());
@@ -28,16 +28,18 @@ contract MetaFactory {
         address clone = Clones.clone(proxyImplementation);
 
         MetaImplementation(clone).initialize(
-            _startPrice, _maxSupply,
+            _startPrice,
+            _maxSupply,
             _nReserved,
             _maxTokensPerMint,
             _uri,
-            _name, _symbol
+            _name,
+            _symbol
         );
 
         MetaImplementation(clone).transferOwnership(msg.sender);
 
-        emit NFTCreated(clone);
+        emit NFTCreated(msg.sender, clone);
     }
 
 }
