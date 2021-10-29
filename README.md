@@ -4,7 +4,7 @@ The Smart Contracts (Proxy and Implementation) to create/mint NFTs used in Metaw
 
 NFTs will be minted randomly instead change the token IDs incrementally, which is pretty easy to predict the NFT's rarities from the metadata.
 
-The random feature in the current implementation is used the [ERC721-extensions](https://github.com/1001-digital/erc721-extensions) maintained by the 1001-digital team. We can replace it with an Oracle like Chainlink pretty easily and straightforward.
+The random feature in the current implementation is buit on top of the [ERC721-extensions](https://github.com/1001-digital/erc721-extensions) maintained by the 1001-digital team. We can replace it with an Oracle like Chainlink pretty easily and straightforward later on.
 
 
 ## Install dependencies
