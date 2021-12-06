@@ -1,27 +1,22 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.0;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
+import "@openzeppelin/contracts/utils/Counters.sol";
 
-/// @author Victor Feng and inpired by 1001.digital (https://github.com/1001-digital/erc721-extensions)
-/// @title An upgradable token tracker that limits the token supply and increments token IDs on each new mint.
-abstract contract WithLimitedSupplyUpgradable is Initializable {
-    using CountersUpgradeable for CountersUpgradeable.Counter;
+/// @author 1001.digital
+/// @title A token tracker that limits the token supply and increments token IDs on each new mint.
+abstract contract WithLimitedSupply {
+    using Counters for Counters.Counter;
 
     // Keeps track of how many we have minted
-    CountersUpgradeable.Counter private _tokenCount;
+    Counters.Counter private _tokenCount;
 
     /// @dev The maximum count of tokens this token tracker will hold.
     uint256 private _maxSupply;
 
     /// Instanciate the contract
     /// @param maxSupply_ how many tokens this collection should hold
-    function __WithLimitedSupply_init(uint256 maxSupply_) internal initializer {
-        __WithLimitedSupply_init_unchained(maxSupply_);
-    }
-
-    function __WithLimitedSupply_init_unchained(uint256 maxSupply_) internal initializer {
+    constructor (uint256 maxSupply_) {
         _maxSupply = maxSupply_;
     }
 
@@ -65,6 +60,4 @@ abstract contract WithLimitedSupplyUpgradable is Initializable {
         require(availableTokenCount() >= amount, "Requested number of tokens not available");
         _;
     }
-
-    uint256[50] private __gap;
 }

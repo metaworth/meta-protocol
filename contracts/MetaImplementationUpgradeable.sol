@@ -1,30 +1,32 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.4;
 
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts/security/Pausable.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/utils/Strings.sol";
-import "./extensions/RandomlyAssigned.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721EnumerableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721BurnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/StringsUpgradeable.sol";
+
+import "./extensions/RandomlyAssignedUpgradeable.sol";
 
 import "hardhat/console.sol";
 
-
-/// @dev this is the non-upgradeable implementation
-contract MetaImplementation is
-    ERC721,
-    ERC721Enumerable,
-    ERC721URIStorage,
-    ERC721Burnable,
-    Ownable,
-    Pausable,
-    Initializable,
-    RandomlyAssigned
+/// @title This is an upgradeable implementation.
+/// The constructor is replaced with initializer.
+/// In this way, we're saving a lot of the deployment costs.
+contract MetaImplementationUpgradeable is
+    ERC721Upgradeable,
+    ERC721EnumerableUpgradeable,
+    ERC721URIStorageUpgradeable,
+    ERC721BurnableUpgradeable,
+    OwnableUpgradeable,
+    PausableUpgradeable,
+    RandomlyAssignedUpgradeable,
+    UUPSUpgradeable
   {
     enum SaleStatus { PENDING, STARTED, PAUSED, ENDED }
 
@@ -35,41 +37,46 @@ contract MetaImplementation is
 
     uint256 internal price;
     uint256 internal reserved;
-    SaleStatus internal saleStatus;
 
     bool private _noContractMint;
+    SaleStatus internal saleStatus;
 
     event MetaMintCompleted(address indexed _owner, uint256 indexed _tokenId);
     event BatchMintCompleted(address indexed _owner, uint256[] _tokenIds);
 
-    constructor(
+    function initialize(
         uint256 _startPrice,
         uint256 _maxSupply,
-        uint256 _reserved,
+        uint256 _nReserved,
         uint256 _maxTokensPerWallet,
         SaleStatus _saleStatus,
         string memory _uri,
         string memory _name,
         string memory _symbol
-    ) ERC721(_name, _symbol) RandomlyAssigned(_maxSupply, 1) {
+    ) public initializer {
+        __ERC721_init(_name, _symbol);
+        __ERC721Enumerable_init();
+        __Ownable_init();
+        __RandomlyAssigned_init(_maxSupply, 1);
+
         price = _startPrice;
-        reserved = _reserved;
+        reserved = _nReserved;
         MAX_TOKENS_PER_WALLET = _maxTokensPerWallet;
         baseURI = _uri;
         saleStatus = _saleStatus;
     }
 
-    function initialize(address _tokenA, address _tokenB) public initializer {
-        require(
-            _tokenA != address(0) && _tokenB != address(0),
-            "TokenA and TokenB must be set"
-        );
-        // tokens = [_tokenA, _tokenB];
-    }
+    /// @dev This constructor ensures that this contract can only be used as a master copy
+    /// Marking constructor as initializer makes sure that real initializer cannot be called
+    /// Thus, as the owner of the contract is 0x0, no one can do anything with the contract
+    /// on the other hand, it's impossible to call this function in proxy,
+    /// so the real initializer is the only initializer
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() initializer {}
 
     /// @dev Check if the sale is started
     modifier whenSaleStarted() {
-        require(saleStatus == SaleStatus.STARTED, "Sale not started yet");
+        require(saleStatus == SaleStatus.STARTED, "Sale not started");
         _;
     }
 
@@ -103,10 +110,10 @@ contract MetaImplementation is
         if (_msgSender() != owner()) {
             require(msg.value >= price, "MetaImplementation#mint: inconsistent amount sent");
             console.log("%s balance: %s - %s", _msgSender(), balanceOf(_msgSender()), MAX_TOKENS_PER_WALLET);
-        }
 
-        if (MAX_TOKENS_PER_WALLET > 0) {
-            require(balanceOf(_msgSender()) < MAX_TOKENS_PER_WALLET, "MetaImplementation#mint: exceeded the max tokens per wallet");
+            if (MAX_TOKENS_PER_WALLET > 0) {
+                require(balanceOf(_msgSender()) < MAX_TOKENS_PER_WALLET, "MetaImplementation#mint: exceeded the max tokens per wallet");
+            }
         }
 
         _safeMint(_msgSender(), _tokenId);
@@ -119,18 +126,13 @@ contract MetaImplementation is
     function walletOfOwner(address _owner) external view returns(uint256[] memory) {
         uint256 tokenCount = balanceOf(_owner);
 
-        uint256[] memory tokenIds = new uint256[](tokenCount);
-        for (uint256 i; i < tokenCount; i++) {
-            tokenIds[i] = tokenOfOwnerByIndex(_owner, i);
+        uint256[] memory tokensId = new uint256[](tokenCount);
+        for(uint256 i; i < tokenCount; i++) {
+            tokensId[i] = tokenOfOwnerByIndex(_owner, i);
         }
-        return tokenIds;
+        return tokensId;
     }
 
-    /**
-     * @dev The owner of this contract can claim a number of reserved NFTs
-     * @param _number The number of NFTs are going to be minted
-     * @param _receiver The wallet that will receive the minted NFTs
-     */
     function claimReserved(uint256 _number, address _receiver)
         external
         ensureAvailabilityFor(_number)
@@ -161,12 +163,16 @@ contract MetaImplementation is
     /// @dev Set the base URI
     /// TODO this might be removed in the future if the base URI cannot be updated
     ///   onced it setup when the contract was initialized
-    function setBaseURI(string calldata _newBaseURI) external onlyOwner {
-        baseURI = _newBaseURI;
+    function setBaseURI(string calldata uri) external onlyOwner {
+        baseURI = uri;
     }
 
-    function setBaseExtension(string calldata _newBaseExtension) external onlyOwner {
-        baseExtension = _newBaseExtension;
+    function setBaseExtension(string calldata _baseExtension) external onlyOwner {
+        baseExtension = _baseExtension;
+    }
+
+    function setReserved(uint256 _reserved) external onlyOwner {
+        reserved = _reserved;
     }
 
     /// @dev Update the sale status
@@ -195,15 +201,6 @@ contract MetaImplementation is
         _unpause();
     }
 
-    function getReservedLeft() public view returns (uint256) {
-        return reserved;
-    }
-
-    /// @dev Get the version of the current implementation
-    function getVersion() public pure returns (string memory) {
-      return "v1.0.0";
-    }
-
     function getPrice() public view returns (uint256) {
         return price;
     }
@@ -211,12 +208,21 @@ contract MetaImplementation is
     function getSaleStatus() public view returns(SaleStatus) {
         return saleStatus;
     }
+
+    function getReservedBalance() public view returns (uint256) {
+        return reserved;
+    }
+
+    /// @dev Get the version of the current implementation
+    function getVersion() public pure returns (string memory) {
+      return "v1.0.0";
+    }
     
     function tokenURI(uint256 tokenId)
         public
         view
         virtual
-        override(ERC721, ERC721URIStorage)
+        override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
         returns (string memory)
     {
         string memory _tokenURI = super.tokenURI(tokenId);
@@ -225,32 +231,34 @@ contract MetaImplementation is
             ? string(abi.encodePacked(_tokenURI, baseExtension))
             : _tokenURI;
     }
-    
+
     function supportsInterface(bytes4 interfaceId)
         public
         view
-        override(ERC721, ERC721Enumerable)
+        override(ERC721Upgradeable, ERC721EnumerableUpgradeable)
         returns (bool)
     {
         return super.supportsInterface(interfaceId);
     }
-
-    function _burn(uint256 tokenId)
-        internal
-        override(ERC721, ERC721URIStorage)
-    {
-        super._burn(tokenId);
+    
+    function _baseURI() internal view override returns (string memory) {
+        return baseURI;
     }
-
+    
     function _beforeTokenTransfer(address from, address to, uint256 tokenId)
         internal
-        override(ERC721, ERC721Enumerable)
+        override(ERC721Upgradeable, ERC721EnumerableUpgradeable)
         whenNotPaused
     {
         super._beforeTokenTransfer(from, to, tokenId);
     }
 
-    function _baseURI() internal view override returns (string memory) {
-        return baseURI;
+    function _burn(uint256 tokenId)
+        internal
+        override(ERC721Upgradeable, ERC721URIStorageUpgradeable)
+    {
+        super._burn(tokenId);
     }
+
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }
