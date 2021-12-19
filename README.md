@@ -8,7 +8,7 @@ The random feature in the current implementation is buit on top of the [ERC721-e
 
 ## MetaFactory Contracts
 
-Emerald Testnet: `0x54BcEf0006E2072d6EC0ef4E1fD087751AdC3cED`
+Emerald Testnet: `0x309A1EA686C0949C1dD099717f4482d5272FCb53`
 
 ## Install dependencies
 
