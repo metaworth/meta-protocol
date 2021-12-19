@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.4;
+pragma solidity ^0.8.0;
 
-import "./WithLimitedSupplyUpgradable.sol";
+import "./WithLimitedSupply.sol";
 
-/// @author Victor Feng and inpired by 1001.digital (https://github.com/1001-digital/erc721-extensions)
-/// @title Upgradable randomly assign tokenIDs from a given set of tokens.
-abstract contract RandomlyAssignedUpgradable is WithLimitedSupplyUpgradable {
+/// @author 1001.digital
+/// @title Randomly assign tokenIDs from a given set of tokens.
+abstract contract RandomlyAssigned is WithLimitedSupply {
     // Used for random index assignment
     mapping(uint256 => uint256) private tokenMatrix;
 
@@ -15,12 +15,9 @@ abstract contract RandomlyAssignedUpgradable is WithLimitedSupplyUpgradable {
     /// Instanciate the contract
     /// @param _totalSupply how many tokens this collection should hold
     /// @param _startFrom the tokenID with which to start counting
-    function __RandomlyAssigned_init(uint256 _totalSupply, uint256 _startFrom) internal initializer {
-        __WithLimitedSupply_init(_totalSupply);
-        __RandomlyAssigned_init_unchained(_totalSupply, _startFrom);
-    }
-
-    function __RandomlyAssigned_init_unchained(uint256 /* _totalSupply */, uint256 _startFrom) internal initializer {
+    constructor (uint256 _totalSupply, uint256 _startFrom)
+        WithLimitedSupply(_totalSupply)
+    {
         startFrom = _startFrom;
     }
 
@@ -62,7 +59,4 @@ abstract contract RandomlyAssignedUpgradable is WithLimitedSupplyUpgradable {
 
         return value + startFrom;
     }
-
-    // for why we need this reserved space, get more details from https://docs.openzeppelin.com/contracts/3.x/upgradeable#storage_gaps
-    uint256[50] private __gap;
 }
