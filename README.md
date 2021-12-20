@@ -6,10 +6,6 @@ NFTs will be minted randomly instead change the token IDs incrementally, which i
 
 The random feature in the current implementation is buit on top of the [ERC721-extensions](https://github.com/1001-digital/erc721-extensions) maintained by the 1001-digital team. We can replace it with an Oracle like Chainlink pretty easily and straightforward later on.
 
-## MetaFactory Contracts
-
-Emerald Testnet: `0x309A1EA686C0949C1dD099717f4482d5272FCb53`
-
 ## Install dependencies
 
 `yarn` or `npm install`
@@ -25,6 +21,12 @@ Emerald Testnet: `0x309A1EA686C0949C1dD099717f4482d5272FCb53`
 ## Run tests
 
 `npx hardhat test`
+
+## Deploy
+
+`npx hardhat --network emeraldTestnet run script/factory-deploy.js`
+
+> NOTES: once the contract get deployed you need to update the [factory contract address](https://github.com/metaworth/meta-interface/blob/main/src/helpers/contracts.ts) in the interface repo.
 
 ## Etherscan verification
 
