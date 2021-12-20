@@ -6,6 +6,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721Enumer
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721BurnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC721/extensions/ERC721URIStorageUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/CountersUpgradeable.sol";
@@ -19,6 +20,7 @@ import "hardhat/console.sol";
 /// The constructor is replaced with initializer.
 /// In this way, we're saving a lot of the deployment costs.
 contract MetaImplementationUpgradeable is
+    Initializable,
     ERC721Upgradeable,
     ERC721EnumerableUpgradeable,
     ERC721URIStorageUpgradeable,
@@ -30,8 +32,7 @@ contract MetaImplementationUpgradeable is
   {
     enum SaleStatus { PENDING, STARTED, PAUSED, ENDED }
 
-    uint256 public MAX_TOKENS_PER_WALLET;
-
+    uint256 public maxTokensPerWallet;
     string public baseURI;
     string public baseExtension;
 
@@ -49,21 +50,19 @@ contract MetaImplementationUpgradeable is
         uint256 _maxSupply,
         uint256 _nReserved,
         uint256 _maxTokensPerWallet,
-        SaleStatus _saleStatus,
         string memory _uri,
         string memory _name,
         string memory _symbol
     ) public initializer {
         __ERC721_init(_name, _symbol);
-        __ERC721Enumerable_init();
         __Ownable_init();
         __RandomlyAssigned_init(_maxSupply, 1);
 
         price = _startPrice;
         reserved = _nReserved;
-        MAX_TOKENS_PER_WALLET = _maxTokensPerWallet;
+        maxTokensPerWallet = _maxTokensPerWallet;
         baseURI = _uri;
-        saleStatus = _saleStatus;
+        saleStatus = SaleStatus.STARTED;
     }
 
     /// @dev This constructor ensures that this contract can only be used as a master copy
@@ -109,10 +108,10 @@ contract MetaImplementationUpgradeable is
         //   and no constraints on the number of NFTs in the same wallet
         if (_msgSender() != owner()) {
             require(msg.value >= price, "MetaImplementation#mint: inconsistent amount sent");
-            console.log("%s balance: %s - %s", _msgSender(), balanceOf(_msgSender()), MAX_TOKENS_PER_WALLET);
+            console.log("%s balance: %s - %s", _msgSender(), balanceOf(_msgSender()), maxTokensPerWallet);
 
-            if (MAX_TOKENS_PER_WALLET > 0) {
-                require(balanceOf(_msgSender()) < MAX_TOKENS_PER_WALLET, "MetaImplementation#mint: exceeded the max tokens per wallet");
+            if (maxTokensPerWallet > 0) {
+                require(balanceOf(_msgSender()) < maxTokensPerWallet, "MetaImplementation#mint: exceeded the max tokens per wallet");
             }
         }
 
@@ -260,5 +259,5 @@ contract MetaImplementationUpgradeable is
         super._burn(tokenId);
     }
 
-    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+    function _authorizeUpgrade(address) internal override onlyOwner {}
 }

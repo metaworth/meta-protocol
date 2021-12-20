@@ -8,7 +8,7 @@ async function main() {
   try {
     const MetaFactory = await ethers.getContractFactory('MetaFactory');
     console.log('Deploying upgradeable MetaFactory...');
-    const metaFactory = await upgrades.deployProxy(MetaFactory);
+    const metaFactory = await upgrades.deployProxy(MetaFactory, { kind: 'uups' });
     console.log('MetaFactory deployment hash:', metaFactory.deployTransaction.hash)
     await metaFactory.deployed();
     console.log('MetaFactory deployed to:', metaFactory.address);

@@ -8,7 +8,7 @@ async function main() {
   try {
     const MetaImplementationUpgradeable = await ethers.getContractFactory('MetaImplementationUpgradeable');
     console.log('Upgrading MetaImplementationUpgradeable...');
-    const metaImpl = await upgrades.upgradeProxy(MetaImplementationUpgradeable, ['1','10','1','1','','Metaworth.io','META']);
+    const metaImpl = await upgrades.deployProxy(MetaImplementationUpgradeable, ['1','10','1','1','','Metaworth.io','META']);
     console.log('MetaImplementation upgrade hash:', metaImpl)
     await metaImpl.deployed();
     console.log('MetaImplementation upgraded');

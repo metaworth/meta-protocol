@@ -10,16 +10,15 @@ const NAME = 'Meta Test'
 const SYMBOL = 'MT'
 const PRICE = '0.03'
 
-
 describe('MetaNFTs', function () {
   before(async function () {
     this.signers = await ethers.getSigners()
     this.signer = this.signers[0]
     this.bob = this.signers[1]
     this.carol = this.signers[2]
-    this.MetaMaster = await ethers.getContractFactory('MetaImplementationUpgradeable')
+    
     const MetaFactory = await ethers.getContractFactory('MetaFactory')
-    this.metaFactory = await upgrades.deployProxy(MetaFactory)
+    this.metaFactory = await upgrades.deployProxy(MetaFactory, { kind: 'uups' })
     await this.metaFactory.deployed()
   })
 
@@ -34,7 +33,6 @@ describe('MetaNFTs', function () {
       MAX_SUPPLY,
       NUM_RESERVED,
       MAX_TKN_PER_WALLET,
-      0,
       URI,
       NAME,
       SYMBOL
@@ -49,7 +47,25 @@ describe('MetaNFTs', function () {
     
     expect(this.metaImplAddr).equals(predictedAddr)
 
-    this.metaImplementation = await this.MetaMaster.attach(predictedAddr)
+    const MetaMaster = await ethers.getContractFactory('MetaImplementationUpgradeable')
+    this.metaImplementation = await MetaMaster.attach(predictedAddr)
+  })
+
+  it('Should be able to withdraw remaining balance to Carols wallet by using owner\'s wallet', async function () {
+    const provider = waffle.provider
+    let balanceOfCarolWalletBeforeWithdraw = await provider.getBalance(this.carol.address)
+
+    const transaction = await this.metaImplementation.connect(this.bob).mint('ipfs://carols.com/1.json', { value: ethers.utils.parseEther('0.03') })
+    await transaction.wait()
+
+    const balanceOfEther = await this.metaImplementation.provider.getBalance(this.metaImplementation.address)
+    expect(balanceOfEther.toString()).equal(ethers.utils.parseEther('0.03').toString())
+
+    const withdrawTx = await this.metaImplementation.withdraw(this.carol.address)
+    await withdrawTx.wait()
+
+    balanceOfCarolWallet = await provider.getBalance(this.carol.address)
+    expect(balanceOfCarolWallet.sub(ethers.utils.parseEther('0.03'))).equal(balanceOfCarolWalletBeforeWithdraw)
   })
 
   it('Should attach the correct meta implementation contract', async function () {
@@ -68,10 +84,6 @@ describe('MetaNFTs', function () {
     expect(await this.metaImplementation.maxSupply()).to.equal(20)
   })
 
-  it('Should be failing to mint if the sale is not in started status', async function () {
-    expect(this.metaImplementation.connect(this.signer).mint('ipfs://carols.com/6.json')).to.be.revertedWith('Sale not started')
-  })
-
   it('Should mint all tokens except the reserved in random order with signer\'s wallet without paying', async function () {
     const availableSupply = await this.metaImplementation.availableTokenCount()
     const resevedLeft = await this.metaImplementation.getReservedBalance()
@@ -83,12 +95,6 @@ describe('MetaNFTs', function () {
     let sold = 0
 
     let saleStatus = await this.metaImplementation.getSaleStatus()
-    expect(saleStatus).equal(0)
-
-    const saleStartTx = await this.metaImplementation.setSaleStatus('1')
-    await saleStartTx.wait()
-
-    saleStatus = await this.metaImplementation.getSaleStatus()
     expect(saleStatus).equal(1)
 
     while (sold < size) {
@@ -103,9 +109,6 @@ describe('MetaNFTs', function () {
   })
 
   it('Should be succeeded to mint if using a non-owner wallet with paying 0.03 ether', async function () {
-    const saleStartTx = await this.metaImplementation.setSaleStatus('1')
-    await saleStartTx.wait()
-
     const transaction = await this.metaImplementation.connect(this.bob).mint('ipfs://carols.com/8.json', { value: ethers.utils.parseEther('0.03') })
     const receipt = await transaction.wait()
     const tokenID = receipt.events.find(e => e.event === 'Transfer').args.tokenId
@@ -120,25 +123,12 @@ describe('MetaNFTs', function () {
     expect(tokenURI.toString()).equal('ipfs://carols.com/8.json')
   })
 
-  it('Should be able to withdraw remaining balance to Carols wallet by using owner\'s wallet', async function () {
-    const provider = waffle.provider
+  it('Should be failing to mint if the sale is not in started status', async function () {
+    await this.metaImplementation.setSaleStatus(0)
 
-    let balanceOfCarolWalletBeforeWithdraw = await provider.getBalance(this.carol.address)
-
-    const saleStartTx = await this.metaImplementation.setSaleStatus('1')
-    await saleStartTx.wait()
-
-    const transaction = await this.metaImplementation.connect(this.bob).mint('ipfs://carols.com/1.json', { value: ethers.utils.parseEther('0.03') })
-    await transaction.wait()
-
-    const balanceOfEther = await this.metaImplementation.provider.getBalance(this.metaImplementation.address)
-    expect(balanceOfEther.toString()).equal(ethers.utils.parseEther('0.03').toString())
-
-    const withdrawTx = await this.metaImplementation.withdraw(this.carol.address)
-    await withdrawTx.wait()
-
-    balanceOfCarolWallet = await provider.getBalance(this.carol.address)
-    expect(balanceOfCarolWallet.sub(ethers.utils.parseEther('0.03'))).equal(balanceOfCarolWalletBeforeWithdraw)
+    const saleStatus = await this.metaImplementation.getSaleStatus()
+    expect(saleStatus.toString()).to.be.equal('0')
+    expect(this.metaImplementation.connect(this.signer).mint('ipfs://carols.com/6.json')).to.be.revertedWith('Sale not started')
   })
 
   it('Should be failing to claim the reserved if the sender is not owner', async function () {
@@ -166,9 +156,6 @@ describe('MetaNFTs', function () {
   })
 
   it('Should batch mint without errors', async function () {
-    const saleStartTx = await this.metaImplementation.setSaleStatus('1')
-    await saleStartTx.wait()
-
     const tokenURIs = ['ipfs://uri1', 'ipfs://uri2', 'ipfs://uri3', 'ipfs://uri4', 'ipfs://uri5']
     const batchMintTx = await this.metaImplementation.batchMint(tokenURIs)
     const receipt = await batchMintTx.wait()
@@ -191,9 +178,6 @@ describe('MetaNFTs', function () {
   })
 
   it('Should not be able to mint if the contract is paused', async function () {
-    const saleStartTx = await this.metaImplementation.setSaleStatus('1')
-    await saleStartTx.wait()
-
     const pauseTx = await this.metaImplementation.pause()
     await pauseTx.wait()
 
@@ -201,9 +185,6 @@ describe('MetaNFTs', function () {
   })
 
   it('Should be failed to mint becaused of the max NFTs per wallet constraints', async function () {
-    const saleStartTx = await this.metaImplementation.setSaleStatus('1')
-    await saleStartTx.wait()
-
     let tokenIdsForBob = await this.metaImplementation.walletOfOwner(this.bob.address)
     expect(tokenIdsForBob.length).equal(0)
 
@@ -218,9 +199,6 @@ describe('MetaNFTs', function () {
   })
 
   it('Should fail to mint if using a non-owner wallet without paying 0.03 ether', async function () {
-    const saleStartTx = await this.metaImplementation.setSaleStatus('1')
-    await saleStartTx.wait()
-
     expect(this.metaImplementation.connect(this.bob).mint('ipfs://carols.com/5.json')).to.be.revertedWith('MetaImplementation#mint: inconsistent amount sent')
   })
 

@@ -5,7 +5,6 @@ import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Burnable.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts/security/Pausable.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Counters.sol";
@@ -23,13 +22,11 @@ contract MetaImplementation is
     ERC721Burnable,
     Ownable,
     Pausable,
-    Initializable,
     RandomlyAssigned
   {
     enum SaleStatus { PENDING, STARTED, PAUSED, ENDED }
 
-    uint256 public MAX_TOKENS_PER_WALLET;
-
+    uint256 public maxTokensPerWallet;
     string public baseURI;
     string public baseExtension;
 
@@ -54,17 +51,9 @@ contract MetaImplementation is
     ) ERC721(_name, _symbol) RandomlyAssigned(_maxSupply, 1) {
         price = _startPrice;
         reserved = _reserved;
-        MAX_TOKENS_PER_WALLET = _maxTokensPerWallet;
+        maxTokensPerWallet = _maxTokensPerWallet;
         baseURI = _uri;
         saleStatus = _saleStatus;
-    }
-
-    function initialize(address _tokenA, address _tokenB) public initializer {
-        require(
-            _tokenA != address(0) && _tokenB != address(0),
-            "TokenA and TokenB must be set"
-        );
-        // tokens = [_tokenA, _tokenB];
     }
 
     /// @dev Check if the sale is started
@@ -102,11 +91,11 @@ contract MetaImplementation is
         //   and no constraints on the number of NFTs in the same wallet
         if (_msgSender() != owner()) {
             require(msg.value >= price, "MetaImplementation#mint: inconsistent amount sent");
-            console.log("%s balance: %s - %s", _msgSender(), balanceOf(_msgSender()), MAX_TOKENS_PER_WALLET);
+            console.log("%s balance: %s - %s", _msgSender(), balanceOf(_msgSender()), maxTokensPerWallet);
         }
 
-        if (MAX_TOKENS_PER_WALLET > 0) {
-            require(balanceOf(_msgSender()) < MAX_TOKENS_PER_WALLET, "MetaImplementation#mint: exceeded the max tokens per wallet");
+        if (maxTokensPerWallet > 0) {
+            require(balanceOf(_msgSender()) < maxTokensPerWallet, "MetaImplementation#mint: exceeded the max tokens per wallet");
         }
 
         _safeMint(_msgSender(), _tokenId);

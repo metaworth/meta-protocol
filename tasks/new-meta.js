@@ -1,6 +1,6 @@
 require('@nomiclabs/hardhat-ethers')
 
-const contractAddress = process.env.META_FACTORY_CONTRACT_ADDRESS
+const contractAddress = '0x6A59CC73e334b018C9922793d96Df84B538E6fD5' || process.env.META_FACTORY_CONTRACT_ADDRESS
 
 const abi = [
   'event MetaDeployed(address indexed _owner, address indexed _metaAddress)',
@@ -26,15 +26,15 @@ task('newMeta', 'Create a new meta contract')
 
     const createNFT = await metaFactoryContract.createNFT(
       bytes32,
-      ethers.utils.parseEther('0.03'),
+      ethers.utils.parseEther('0'),
       '10',
-      '1',
-      '1',
-      'ipfs://',
+      '0',
+      '0',
+      '',
       'Test OK',
       'TO',
     )
-    console.log('createNFT tx:', createNFT.hash)
+    console.log('createNFT tx hash:', createNFT.hash)
     const receipt = await createNFT.wait()
     if (receipt.events) {
       const deployedAddr = receipt.events

@@ -39,7 +39,7 @@ contract ERC721Base is
     function mint(address _to, string memory _cid) public onlyOwner whenNotPaused {
         // Checking if the sender is from a intermediary contract
         if (!_noContractMint) {
-            require(tx.origin == _msgSender(), "MetaImplementation#mint: cannot mint NFTs through a contract");
+            require(tx.origin == _msgSender(), "ERC721Base#mint: cannot mint NFTs through a contract");
         }
 
         _tokenIds.increment();
