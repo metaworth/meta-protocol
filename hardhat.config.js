@@ -31,8 +31,12 @@ module.exports = {
     localhost: {
       url: "http://localhost:8545",
     },
-    emeraldTestnet: {
+    emerald: {
       url: process.env.EMERALD_RPC,
+      accounts: [`0x${process.env.PRIVATE_KEY}`]
+    },
+    emeraldTestnet: {
+      url: process.env.EMERALD_TESTNET_RPC,
       accounts: [`0x${process.env.PRIVATE_KEY}`]
     },
     rinkeby: {
@@ -67,6 +71,10 @@ module.exports = {
     },
     mumbai: {
       url: process.env.MUMBAI_RPC,
+      accounts: [`0x${process.env.PRIVATE_KEY}`]
+    },
+    stardust: {
+      url: "https://stardust.metis.io/?owner=588",
       accounts: [`0x${process.env.PRIVATE_KEY}`]
     },
   },

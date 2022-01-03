@@ -100,7 +100,7 @@ contract MetaImplementationUpgradeable is
         require(tokenCount() <= maxSupply() - reserved, "MetaImplementation#mint: no enough NFTs left");
 
         // Checking if the sender is from a intermediary contract
-        if (!_noContractMint) {
+        if (_noContractMint) {
             require(tx.origin == _msgSender(), "MetaImplementation#mint: cannot mint NFTs through a contract");
         }
         

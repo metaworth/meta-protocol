@@ -31,14 +31,38 @@ contract ERC721Base is
 
     bool private _noContractMint;
 
+    event BatchMintCompleted(address indexed _owner, uint256[] _tokenIds);
+
     function initialize(string memory _name, string memory _symbol) initializer public {
         __Ownable_init();
         __ERC721_init(_name, _symbol);
+        _tokenIds.increment();
+        _noContractMint = true;
+    }
+
+    function batchMintWithSameURI(address[] calldata _addrs, string calldata _tokenURI) external returns (uint256[] memory) {
+        require(bytes(_tokenURI).length > 0, "ERC721Base#batchMintWithSameURI: token URI is required");
+        if (_noContractMint) {
+            require(tx.origin == _msgSender(), "ERC721Base#batchMintWithSameURI: cannot mint NFTs through a contract");
+        }
+
+        uint256[] memory _tknIds = new uint256[](_addrs.length);
+
+        for (uint i = 0; i < _addrs.length; i++) {
+            uint256 _tokenId = _tokenIds.current();
+            _safeMint(_addrs[i], _tokenId);
+            _setTokenURI(_tokenId, _tokenURI);
+            _tknIds[i] = _tokenId;
+            _tokenIds.increment();
+        }
+
+        emit BatchMintCompleted(_msgSender(), _tknIds);
+        return _tknIds;
     }
 
     function mint(address _to, string memory _cid) public onlyOwner whenNotPaused {
         // Checking if the sender is from a intermediary contract
-        if (!_noContractMint) {
+        if (_noContractMint) {
             require(tx.origin == _msgSender(), "ERC721Base#mint: cannot mint NFTs through a contract");
         }
 
